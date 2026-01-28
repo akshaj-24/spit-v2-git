@@ -109,17 +109,17 @@ BASE_MODEL = "qwen3:32b"
 PATIENT_OPTIONS = {
     "temperature": 0.9,
     "stop": ["}"],
-    "num_ctx": 12288,
+    "num_ctx": 13288,
 }
 INTERVIEWER_OPTIONS = {
     "temperature": 0.6,
     "stop": ["}"],
-    "num_ctx": 12288,
+    "num_ctx": 13288,
 }
 BASE_OPTIONS = {
     "temperature": 0.3,
     "stop": ["}"],
-    "num_ctx": 12288,
+    "num_ctx": 13288,
 }
 # top_p = 0.9
 # top_k = 40
