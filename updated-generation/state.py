@@ -79,12 +79,14 @@ class State:
         
         path = Path(self.phase_transcript)
         if not path.exists() or path.stat().st_size == 0:
+            print("No last answer")
             return ""
         
         
         df = pd.read_json(self.phase_transcript, lines=True)  # JSONL [web:21]
         
         if "role" not in df.columns or "content" not in df.columns:
+            print("No last answer")
             return ""
         
         

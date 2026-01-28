@@ -9,6 +9,9 @@ import requests
 import json
 import functions
 from pydantic import BaseModel, ConfigDict, Field
+import output_parser as op
+import time
+import re
 
 ASCII_PRINTABLE = r"^[\t\n -~]*$"   # tabs/newlines + ASCII 0x20..0x7E
 
@@ -105,12 +108,18 @@ INTERVIEWER_MODEL = "qwen3:32b"
 BASE_MODEL = "qwen3:32b"
 PATIENT_OPTIONS = {
     "temperature": 0.9,
+    "stop": ["}"],
+    "num_ctx": 12288,
 }
 INTERVIEWER_OPTIONS = {
     "temperature": 0.6,
+    "stop": ["}"],
+    "num_ctx": 12288,
 }
 BASE_OPTIONS = {
     "temperature": 0.3,
+    "stop": ["}"],
+    "num_ctx": 12288,
 }
 # top_p = 0.9
 # top_k = 40
@@ -133,74 +142,184 @@ interviewer_model = ollama.Client(host='http://localhost:11434')
 patient_model = ollama.Client(host='http://localhost:11434')
 base_model = ollama.Client(host='http://localhost:11434')
 
-def get_interviewer_response(prompt_text: str) -> str:
-    resp = interviewer_model.chat(
-        model=INTERVIEWER_MODEL,
+def get_tokens(resp):
+    prompt_match = re.search(r"prompt_eval_count=(\d+)", str(resp))
+    # Regex pattern to capture the number after 'eval_count='
+    eval_match = re.search(r"eval_count=(\d+)", str(resp))
+    prompt_count = int(prompt_match.group(1)) if prompt_match else 0
+    eval_count = int(eval_match.group(1)) if eval_match else 0
+    total_tokens = prompt_count + eval_count
+    print(total_tokens)
+    
+def get_response_thinking(client, model, prompt_text: str, options, role) -> str:
+    
+    system = None
+    
+    if (role == "interviewer"):
+        system = """You are a medical psychiatrist interviewer that follows the instructions given by the user. Respond in valid JSON with this exact shape:
+{
+  \"text\": string
+}
+Do not include any other keys or commentary."""
+    elif (role == "patient"):
+        system = """You are a medical psychiatrist patient that follows the instructions given by the user. Respond in valid JSON with this exact shape:
+{
+  \"text\": string
+}
+Do not include any other keys or commentary."""
+    elif (role == "system"):
+        system = """You are a medical psychiatrist system agent that follows the instructions given by the user. Respond in valid JSON with this exact shape:
+{
+  \"text\": string
+}
+Do not include any other keys or commentary."""
+    
+    
+    resp = client.chat(
+        model=model,
         messages=[
-            {"role": "system", "content": "You are a medical psychiatrist interviewer that follows the instructions given by the user. Return ONLY JSON matching the schema."},
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt_text}
+        ],
+        #format=schema,
+        stream=False,
+        options=options,
+    )
+    return resp
+
+def get_response(client, model, prompt_text: str, options, role, schema) -> str:
+    
+    system = None
+    
+    if (role == "interviewer"):
+        system = "You are a medical psychiatrist interviewer that follows the instructions given by the user. Return ONLY text matching the schema."
+    elif (role == "patient"):
+        system = "You are a medical psychiatrist patient that follows the instructions given by the user. Return ONLY JSON matching the schema."
+    elif (role == "system"):
+        system = "You are a helpful assistant that follows the instructions given by the user. Return ONLY JSON matching the schema."
+    
+    
+    resp = client.chat(
+        model=model,
+        messages=[
+            {"role": "system", "content": system},
             {"role": "user", "content": prompt_text}
         ],
         format=schema,
         stream=False,
-        options=INTERVIEWER_OPTIONS,
+        options=options,
+    )
+    return resp
+
+def get_interviewer_response(prompt_text: str) -> str:
+
+    resp = get_response_thinking(
+        interviewer_model,
+        INTERVIEWER_MODEL,
+        prompt_text,
+        INTERVIEWER_OPTIONS,
+        "interviewer",
     )
     
-    raw = resp["message"]["content"]
+    get_tokens(resp)
+    raw = resp["message"]["content"] + "}"
     
     try:
-        content = TextResponse.model_validate_json(raw).text
+        data = op.extract_first_json(raw)
+        content = data["text"]
     except Exception as e:
-        print("Recursive call")
+        print("Recursive call\n\n")
+        print(f"Raw {raw} \n\n")
+        print(f"Error {e} \n\n")
+        print("---------------------------------------------------------------------------------------------------------------------------\n\n")
         return get_interviewer_response(prompt_text)    
     
-    print(content)
+    print(f"INTERVIEWER: {content}\n")
     return content
 
 def get_patient_response(prompt_text: str) -> str:
-    resp = patient_model.chat(
-        model=PATIENT_MODEL,
-        messages=[
-            {"role": "system", "content": "You are a medical psychiatrist patient that follows the instructions given by the user. Return ONLY JSON matching the schema."},
-            {"role": "user", "content": prompt_text}
-        ],
-        format=schema,
-        stream=False,
-        options=PATIENT_OPTIONS,
+
+    resp = get_response_thinking(
+        patient_model,
+        PATIENT_MODEL,
+        prompt_text,
+        PATIENT_OPTIONS,
+        "patient",
     )
-    
-    raw = resp["message"]["content"]
+
+    get_tokens(resp)
+    raw = resp["message"]["content"] + "}"
     
     try:
-        content = TextResponse.model_validate_json(raw).text
+        data = op.extract_first_json(raw)
+        content = data["text"]
     except Exception as e:
-        print("Recursive call")
+        print("Recursive call\n\n")
+        print(f"Raw {raw} \n\n")
+        print(f"Error {e} \n\n")
+        print("---------------------------------------------------------------------------------------------------------------------------\n\n")
         return get_patient_response(prompt_text)   
     
-    print(content)
+    print(f"PATIENT: {content}\n")
     return content
 
 def get_base_response(prompt_text: str) -> str:
-    resp = base_model.chat(
-        model=BASE_MODEL,
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant that follows the instructions given by the user. Return ONLY JSON matching the schema."},
-            {"role": "user", "content": prompt_text}
-        ],
-        format=schema,
-        stream=False,
-        options=BASE_OPTIONS,
+    
+    resp = get_response_thinking(
+        base_model,
+        BASE_MODEL,
+        prompt_text,
+        BASE_OPTIONS,
+        "system",
     )
     
-    raw = resp["message"]["content"]
+    get_tokens(resp)
+    raw = resp["message"]["content"] + "}"
     
     try:
-        content = TextResponse.model_validate_json(raw).text
+        data = op.extract_first_json(raw)
+        content = data["text"]
     except Exception as e:
-        print("Recursive call")
+        print("Recursive call\n\n")
+        print(f"Raw {raw} \n\n")
+        print(f"Error {e} \n\n")
+        print("---------------------------------------------------------------------------------------------------------------------------\n\n")
         return get_base_response(prompt_text)   
     
     
-    print(content)
+    print(f"SYS: {content}\n")
+    return content
+
+def get_summary_response(prompt_text: str) -> str:
+    
+    resp = get_response_thinking(
+        base_model,
+        BASE_MODEL,
+        prompt_text,
+        BASE_OPTIONS,
+        "system",
+    )
+
+    get_tokens(resp)
+    raw = resp["message"]["content"] + "}"
+    
+    try:
+        subjective = raw["subjective"]
+        objective = raw["objective"]
+        assessment = raw["assessment"]
+        plan = raw["plan"]
+        
+        content = f"Subjective: {subjective}\n\nObjective: {objective}\n\nAssessment: {assessment}\n\nPlan: {plan}"
+        
+    except Exception as e:
+        print("Recursive call\n\n")
+        print(f"Raw {raw} \n\n")
+        print(f"Error {e} \n\n")
+        print("---------------------------------------------------------------------------------------------------------------------------\n\n")
+        return get_summary_response(prompt_text)   
+    
+    
+    print(f"SYS: {content}\n")
     return content
 
 #----------------------------------------------------------------#
@@ -228,7 +347,7 @@ def createSessionSummary():
 
     dialogue = "\n".join([f"{row['role']}: {row['content']}" for _, row in df.iterrows()])
 
-    summary = get_base_response(prompt.session_summary_prompt(dialogue))
+    summary = get_summary_response(prompt.session_summary_prompt(dialogue))
     
     df.loc[len(df)] = ["system", f"--- Session Summary ---\n\n{summary}\n\n--- End Summary ---"]
     df.to_json(session.session_transcript, orient="records", lines=True)
@@ -253,6 +372,7 @@ def conversation():
     while True:
         
         # print(session.state.get_current_phase())
+        # time.sleep(4)
         
         interviewer_prompt = prompt.create_interviewer_prompt(load_phase(session.state.get_current_phase()))
         interviewer_response = get_interviewer_response(interviewer_prompt)
@@ -276,8 +396,13 @@ def conversation():
     
     return
 
-conversation()
+i = 1
 
-print("Conversation Ended.")
+while i < 11:
+    conversation()
+    i += 1
+    print("Conversation Ended.")
+    
+print("All Conversations Ended.")
         
 #-----------------------------------------------------------------#
