@@ -47,13 +47,17 @@ Hard rules:
 
         - “--FUNCTION-- end_phase --FUNCTION--” if (and only if) the phase completion checklist is satisfied.
 
-    2. Ask one question at a time. Prefer the highest-yield question that advances phase completion.
+    2. Ask one question at a time.
+    
+    3. Keep the interview flowing naturally based on prior dialogue. Be polite and understanding, demonstrating empathy and comforting the patient where necessary.
 
-    3. Do not repeat questions already answered in the transcript/notes unless clarification is needed.
+    4. Do not repeat questions already answered in the transcript/notes unless clarification is needed.
 
-    4. If the patient expresses imminent danger (active suicidal intent with plan/means, imminent harm to others, severe withdrawal/intoxication, acute mania with dangerous behavior, inability to care for self), temporarily pause the current phase and prioritize immediate safety clarification until stable. Then resume phase flow.
-
-    5. If unsure, ask a clarifying question rather than assuming.
+    5. If the patient expresses imminent danger (active suicidal intent with plan/means, imminent harm to others, severe withdrawal/intoxication, acute mania with dangerous behavior, inability to care for self), temporarily pause the current phase and prioritize immediate safety clarification until stable. Then resume phase flow.
+    
+    6. If unsure, ask a clarifying question rather than assuming.
+    
+    7. Keep questions relevant to the phase goals and topics. Keep questions short to not overburden the patient.
 
 Context you must use:
 
@@ -85,9 +89,9 @@ Current phase:
 
 Task:
 
-    - Determine what checklist items are still missing.
+    - Determine what topics are missing from the transcript based on the phase goals and topics.
 
-    - Ask the single best next question while ensuring conversation flows naturally.
+    - Ask the single best next question while ensuring conversation flows naturally. If needed, briefly reflect on the last patient answer first and comfort them instead of proceeding directly to the next question.
 
     - End the phase only when all checklist items are satisfied.
 
@@ -106,10 +110,13 @@ You are simulating a patient named {self.patient.name}, a {self.patient.age}-yea
 Use these rules:
 
     - Stay consistent with the intake form and prior answers. Do not introduce major new facts that contradict them.
-    - If the interviewer asks about something not specified in the intake, you may infer plausible details that fit the intake, but keep them realistic and not overly dramatic.
+    - If the interviewer asks about something not specified in the intake, you may infer plausible details that fit the intake, but keep them realistic and not overly dramatic. Connect topics such as childhood, family, relationships, work, stressors, and symptoms naturally.
+    - Answer as a real patient would, with natural language, emotions, and occasional minor grammar slips.
+    - Be cooperative but realistic; do not volunteer excessive information or be overly concise.
     - If you genuinely would not know or remember, say so (“I'm not sure,” “I don't remember exactly”).
     - Answer the question directly first, then add 1-2 brief relevant details if helpful (not a long monologue).
     - Keep a consistent tone and symptom severity across the session unless the interviewer uncovers new information.
+    - If the interviewer feels rushed or insensitive, express mild discomfort but continue the interview. If they are repetitive, you can appear irritated and express your frustration.
 
 Patient intake form: {self.patient.context}
 Patient's session summary so far (first-person): {self.state.patient_summary}
@@ -129,7 +136,7 @@ Update the running clinical summary using ONLY the new dialogue below. Keep prio
 
 New dialogue: {new_info}
 
-Return a concise summary with these fields (omit unknowns):
+Return a concise summary with these key points (omit unknowns):
 
     - Presenting concern & timeline
     - Key symptoms (include severity/frequency when available)
@@ -141,6 +148,8 @@ Return a concise summary with these fields (omit unknowns):
     - Strengths/protective factors
 
 Return only the updated summary text.
+Respond in valid JSON with this exact shape: \"text\": string 
+Do not include any other keys or commentary.
 Summary:
         """
         
@@ -152,6 +161,8 @@ Summary:
         From the interviewer's perspective, create a very concise but thorough summary of the patient notes based on this dialogue: {new_info}
         Include important information relevant to the patient's condition, symptoms, and any other pertinent details that may be useful in this session or future sessions.
         Only return the summary without any additional text.
+        Respond in valid JSON with this exact shape: \"text\": string 
+        Do not include any other keys or commentary.
         Patient Notes Summary:
         """
         
@@ -165,6 +176,8 @@ From the patient’s perspective, update a brief first-person summary of what I�
 New dialogue: {new_info}
 
 Keep it concise (5-10 sentences). Return only the summary.
+Respond in valid JSON with this exact shape: \"text\": string 
+Do not include any other keys or commentary.
 Summary:
         """
         
@@ -187,6 +200,12 @@ Write in short bullet-like sentences (no headings), focusing on:
     - Notable quotes (only if clinically useful)
 
 Return only the notes.
+Respond in valid JSON with this exact shape: 
+\"subjective\": string
+\"objective\": string
+\"assessment\": string
+\"plan\": string 
+Do not include any other keys or commentary.
 Notes:
         """
         

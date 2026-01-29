@@ -156,19 +156,19 @@ def get_response_thinking(client, model, prompt_text: str, options, role) -> str
     system = None
     
     if (role == "interviewer"):
-        system = """You are a medical psychiatrist interviewer that follows the instructions given by the user. Respond in valid JSON with this exact shape:
+        system = """You are a medical psychiatrist interviewer that follows the instructions given by the user. Respond in English with valid JSON with this exact shape:
 {
   \"text\": string
 }
 Do not include any other keys or commentary."""
     elif (role == "patient"):
-        system = """You are a medical psychiatrist patient that follows the instructions given by the user. Respond in valid JSON with this exact shape:
+        system = """You are a medical psychiatrist patient that follows the instructions given by the user. Respond in English with valid JSON with this exact shape:
 {
   \"text\": string
 }
 Do not include any other keys or commentary."""
     elif (role == "system"):
-        system = """You are a medical psychiatrist system agent that follows the instructions given by the user. Respond in valid JSON with this exact shape:
+        system = """You are a medical psychiatrist system agent that follows the instructions given by the user. Respond in English with valid JSON with this exact shape:
 {
   \"text\": string
 }
@@ -303,6 +303,8 @@ def get_summary_response(prompt_text: str) -> str:
     get_tokens(resp)
     raw = resp["message"]["content"] + "}"
     
+    raw = op.extract_first_json(raw)
+    
     try:
         subjective = raw["subjective"]
         objective = raw["objective"]
@@ -396,12 +398,19 @@ def conversation():
     
     return
 
-i = 1
 
-while i < 11:
-    conversation()
-    i += 1
-    print("Conversation Ended.")
+i = 1
+ 
+ 
+while True:
+    try:
+        print(f"------------------------------------------------------ Conversation {i} ---------------------------------------------------------\n")
+        conversation()
+        print(f"------------------------------------------------------ End {i} ---------------------------------------------------------\n")
+        i += 1
+    except Exception:
+        continue
+    
     
 print("All Conversations Ended.")
         
